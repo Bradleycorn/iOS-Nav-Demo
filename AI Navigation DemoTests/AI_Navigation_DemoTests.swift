@@ -1,35 +1,80 @@
-//
-//  AI_Navigation_DemoTests.swift
-//  AI Navigation DemoTests
-//
-//  Created by Bradley Ball on 7/19/24.
-//
-
 import XCTest
+import SwiftUI
+@testable import AI_Navigation_Demo
 
-final class AI_Navigation_DemoTests: XCTestCase {
-
-    override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
+class NavigationCoordinatorTests: XCTestCase {
+    var coordinator: NavigationCoordinator!
+    
+    override func setUp() {
+        super.setUp()
+        coordinator = NavigationCoordinator()
     }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
+    
+    override func tearDown() {
+        coordinator = nil
+        super.tearDown()
     }
-
-    func testExample() throws {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // Any test you write for XCTest can be annotated as throws and async.
-        // Mark your test throws to produce an unexpected failure when your test encounters an uncaught error.
-        // Mark your test async to allow awaiting for asynchronous code to complete. Check the results with assertions afterwards.
+    
+    func testInitialState() {
+        XCTAssertEqual(coordinator.selectedTab, .feed)
+        XCTAssertEqual(coordinator.tabStacks.count, 3)
+        XCTAssertEqual(coordinator.tabStacks[.feed]?.count ?? 0, 0)
+        XCTAssertEqual(coordinator.tabStacks[.messages]?.count ?? 0, 0)
+        XCTAssertEqual(coordinator.tabStacks[.notifications]?.count ?? 0, 0)
     }
-
-    func testPerformanceExample() throws {
-        // This is an example of a performance test case.
-        measure {
-            // Put the code you want to measure the time of here.
-        }
+    
+    func testNavigateToTab() {
+        coordinator.navigate(to: .tabItem(.messages))
+        XCTAssertEqual(coordinator.selectedTab, .messages)
     }
-
+    
+    func testNavigateToRoute() {
+        coordinator.navigate(to: .profile(userId: "123"))
+        XCTAssertEqual(coordinator.tabStacks[.feed]?.count, 1)
+    }
+    
+    func testNavigateBack() {
+        coordinator.navigate(to: .profile(userId: "123"))
+        coordinator.navigate(to: .settings)
+        XCTAssertEqual(coordinator.tabStacks[.feed]?.count, 2)
+        
+        coordinator.navigateBack()
+        XCTAssertEqual(coordinator.tabStacks[.feed]?.count, 1)
+    }
+    
+    func testNavigateToRoot() {
+        coordinator.navigate(to: .profile(userId: "123"))
+        coordinator.navigate(to: .settings)
+        XCTAssertEqual(coordinator.tabStacks[.feed]?.count, 2)
+        
+        coordinator.navigateToRoot()
+        XCTAssertEqual(coordinator.tabStacks[.feed]?.count, 0)
+    }
+    
+    func testHandleDeepLink() {
+        let url = URL(string: "myapp://profile?userId=456")!
+        coordinator.handleDeepLink(url)
+        XCTAssertEqual(coordinator.tabStacks[.feed]?.count, 1)
+    }
+    
+    func testNavigationAcrossTabs() {
+        coordinator.navigate(to: .profile(userId: "123"))
+        XCTAssertEqual(coordinator.tabStacks[.feed]?.count, 1)
+        
+        coordinator.navigate(to: .tabItem(.messages))
+        XCTAssertEqual(coordinator.selectedTab, .messages)
+        XCTAssertEqual(coordinator.tabStacks[.messages]?.count, 0)
+        
+        coordinator.navigate(to: .detail(itemId: 456))
+        XCTAssertEqual(coordinator.tabStacks[.messages]?.count, 1)
+        
+        // Feed tab should still have its navigation stack
+        XCTAssertEqual(coordinator.tabStacks[.feed]?.count, 1)
+    }
+    
+    func testInvalidDeepLink() {
+        let url = URL(string: "myapp://invalidroute")!
+        coordinator.handleDeepLink(url)
+        XCTAssertEqual(coordinator.tabStacks[.feed]?.count, 0)
+    }
 }
